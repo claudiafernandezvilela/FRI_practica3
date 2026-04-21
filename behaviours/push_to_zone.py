@@ -1,19 +1,17 @@
 #
 # Comportamiento 4: PushToZone (prioridad más alta)
-#
-# CAMBIOS respecto a la versión anterior:
-#   - IR_NEAR_OBJ bajado de 200 → 20 (consistente con el resto)
-#   - Añadido reset de detected_object label para forzar nueva búsqueda
+# Empuja el objeto hacia el contenedor hasta que el QR esté muy cerca.
+# Si pierde el QR, cede el control a FindContainer.
 #
 
 from .behaviour import Behaviour
 from robobopy.utils.IR import IR
 
-PUSH_SPEED  = 18
-BACK_SPEED  = 15
-PUSH_TIME   = 2.0
-BACK_TIME   = 0.8
-IR_NEAR_OBJ = 20    # ← AJUSTADO
+PUSH_SPEED   = 15
+BACK_SPEED   = 10
+BACK_TIME    = 0.8
+IR_NEAR_OBJ  = 5
+QR_DISTANCE  = 10   # ajustar según pruebas
 
 class PushToZone(Behaviour):
 
@@ -35,19 +33,39 @@ class PushToZone(Behaviour):
         for bh in self.supress_list:
             bh.supress = True
 
-        # Empujar hacia el contenedor
-        self.robot.moveWheels(PUSH_SPEED, PUSH_SPEED)
-        self.robot.wait(PUSH_TIME)
+        # Empujar hasta llegar al contenedor o perder el QR
+        while not self.stopped():
+            self.robot.moveWheels(PUSH_SPEED, PUSH_SPEED)
+            self.robot.wait(0.1)
 
-        # Retroceder
+            qr = self.robot.readQR()
+            if qr is not None and qr.distance > 0:
+                print(f"      push QR distance={qr.distance:.1f}")
+                if qr.distance < QR_DISTANCE:
+                    self.robot.stopMotors()
+                    print("      Llegado al contenedor.")
+                    break
+            else:
+                # Perdió el QR → ceder a FindContainer
+                self.robot.stopMotors()
+                print("      QR perdido, volviendo a FindContainer.")
+                self.params["qr_centered"] = False
+                for bh in self.supress_list:
+                    bh.supress = False
+                return
+
+        # Retroceder del contenedor
         self.robot.moveWheels(-BACK_SPEED, -BACK_SPEED)
         self.robot.wait(BACK_TIME)
         self.robot.stopMotors()
 
-        # Resetear estado para buscar el siguiente objeto
+        # Resetear estado
         self.params["detected_object"] = None
         self.params["qr_centered"]     = False
-        print("      ✓ Objeto depositado. Buscando siguiente...")
+        self.params["objeto_cerca"]     = False
+
+        print("      Objeto depositado.")
+        self.params["stop"] = True
 
         for bh in self.supress_list:
             bh.supress = False

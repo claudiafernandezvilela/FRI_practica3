@@ -7,22 +7,18 @@ from robobopy.utils.IR import IR
 
 MIN_CONFIDENCE = 0.5
 IMAGE_CENTER_X = 160   # Centro horizontal de la imagen (320px / 2)
-IR_GOAL        = 20   # Valor IR que indica que el objeto está muy cerca
+IR_GOAL        = 20    # Umbral para pasar a approach final
+IR_CONTACT     = 100    # Umbral de contacto real con el objeto
 
-# Parámetros PD (mismos que Ejercicio 2)
-KP = 0.05
-KD = 0.1
+# Parámetros PD
+KP = 0.02
+KD = 0.05
 
-# Límites de velocidad
-speed = 8
+# Velocidad base de avance
+BASE_SPEED = 10
 
-def speed_limits(speed, min_speed=2, max_speed=10):
-    if speed > max_speed:
-        return max_speed
-    elif speed < min_speed:
-        return min_speed
-    else:
-        return speed
+def clamp(value, min_val, max_val):
+    return max(min_val, min(value, max_val))
 
 class DetectObject(Behaviour):
 
@@ -36,8 +32,31 @@ class DetectObject(Behaviour):
             return obj
         return None
 
+    def _approach_final(self):
+        """Avanza despacio hasta contacto real con el objeto."""
+        print("      Modo approach final...")
+        while not self.stopped():
+            ir_front_c = self.robot.readIRSensor(IR.FrontC)
+            ir_front_l = self.robot.readIRSensor(IR.FrontL)
+            ir_front_r = self.robot.readIRSensor(IR.FrontR)
+            ir_value = max(ir_front_c or 0, ir_front_l or 0, ir_front_r or 0)
+
+            print(f"      approach_final IR={ir_value}")
+
+            if ir_value >= IR_CONTACT:
+                self.robot.stopMotors()
+                self.params["objeto_cerca"] = True
+                self.params["detected_object"] = self.params["obj"]
+                print(f"      Contacto con objeto (IR={ir_value})")
+                break
+
+            self.robot.moveWheels(5, 5)
+            self.robot.wait(0.1)
+
     def take_control(self):
         if self.supress:
+            return False
+        if self.params.get("objeto_cerca"):
             return False
         obj = self._read_object()
         if obj is None:
@@ -46,50 +65,55 @@ class DetectObject(Behaviour):
         return True
 
     def action(self):
+        # Guardia: si ya estamos cerca al entrar, no hacer nada
+        if self.params.get("objeto_cerca"):
+            return
+
         print(f"----> control: DetectObject ({self.params['obj'].label})")
         self.supress = False
-        self.last_error = 0  # Resetear derivativo al tomar el control
+        self.last_error = 0
 
         for bh in self.supress_list:
             bh.supress = True
 
-        # ── Bucle continuo (igual que approach_blob_PD del Ejercicio 2) ──
         while not self.stopped():
 
             obj = self._read_object()
 
-            # Si pierde el objeto, ceder a Explore
+            # Si pierde el objeto, ceder control a Explore
             if obj is None:
                 print("      Objeto perdido, cediendo control.")
                 self.robot.stopMotors()
                 break
 
             self.params["obj"] = obj
-
             ir_central = self.robot.readIRSensor(IR.FrontC)
 
-            # Si está muy cerca → parar y ceder control
+            # Fase 2: ya está cerca, approach final
             if ir_central is not None and ir_central >= IR_GOAL:
                 self.robot.stopMotors()
-                print(f"      Objeto alcanzado (IR={ir_central})")
+                self._approach_final()
                 break
 
-            # ── Control PD lateral: centra el objeto en la imagen ──
-            error      = IMAGE_CENTER_X - obj.x      # + = objeto a la izq
+            # Fase 1: control PD para centrarse y avanzar
+
+            # Detección dudosa con x=0: girar buscando el objeto
+            if obj.x == 0:
+                self.robot.moveWheels(BASE_SPEED, -BASE_SPEED)
+                self.robot.wait(0.1)
+                continue
+
+            error      = IMAGE_CENTER_X - obj.x
             derivative = error - self.last_error
-            correction = (error * KP) + (derivative * KD)
-            correction = max(-8, min(correction, 8))
+            correction = clamp((error * KP) + (derivative * KD), -BASE_SPEED, BASE_SPEED)
             self.last_error = error
 
-            # ── Velocidad base ──
-            speed = error * KP
-            limited_speed = speed_limits(speed)
-
-            left_speed  = limited_speed - correction
-            right_speed = limited_speed + correction
+            left_speed  = clamp(BASE_SPEED + correction, -BASE_SPEED, BASE_SPEED)
+            right_speed = clamp(BASE_SPEED - correction, -BASE_SPEED, BASE_SPEED)
 
             print(f"      '{obj.label}' x={obj.x} IR={ir_central} "
-                  f"err={error:.1f} corr={correction:.2f}")
+                  f"err={error:.1f} corr={correction:.2f} "
+                  f"L={left_speed:.1f} R={right_speed:.1f}")
 
             self.robot.moveWheels(int(right_speed), int(left_speed))
             self.robot.wait(0.1)

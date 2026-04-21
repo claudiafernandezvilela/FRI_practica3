@@ -1,6 +1,8 @@
 from robobopy.Robobo import Robobo
 from behaviours.explore import Explore
 from behaviours.detect_object import DetectObject
+from behaviours.find_container import FindContainer
+from behaviours.push_to_zone import PushToZone
 import time
 
 def main():
@@ -15,24 +17,26 @@ def main():
     robobo.wait(1)
 
     params = {
-        "stop": False,
+        "stop":            False,
         "detected_object": None,
-        "objeto_cerca": False,
+        "objeto_cerca":    False,
+        "qr_centered":     False,
+        "obj":             None,
     }
 
-    explore = Explore(robobo, [], params)
-    detect  = DetectObject(robobo, [explore], params)
+    explore        = Explore(robobo, [], params)
+    detect         = DetectObject(robobo, [explore], params)
+    find_container = FindContainer(robobo, [explore, detect], params)
+    push_to_zone   = PushToZone(robobo, [explore, detect, find_container], params)
 
-    threads = [explore, detect]
+    threads = [explore, detect, find_container, push_to_zone]
     for t in threads:
         t.start()
 
-    # Parar cuando el objeto esté cerca
     while not params["stop"]:
-        if params.get("objeto_cerca"):
-            print("=== Objeto alcanzado. ===")
-            params["stop"] = True
         time.sleep(0.1)
+
+    print("=== Misión completada. ===")
 
     for t in threads:
         t.join(timeout=2)
