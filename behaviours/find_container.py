@@ -14,7 +14,7 @@ ALIGN_SPEED    = 3    # suave para no pasarse
 PAN_CENTER_TOL = 20   # para antes
 
 OBJECT_TO_QR = {
-    "cup":       "PAPER",
+    "bottle":       "PLASTIC",
 }
 
 class FindContainer(Behaviour):
@@ -37,6 +37,8 @@ class FindContainer(Behaviour):
 
         for bh in self.supress_list:
             bh.supress = True
+
+        self.robot.movePanTo(0, PAN_SPEED, wait=True)
 
         label      = self.params["detected_object"].label.lower()
         target_qr  = OBJECT_TO_QR.get(label)

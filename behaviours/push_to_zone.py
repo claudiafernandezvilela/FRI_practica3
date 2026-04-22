@@ -11,7 +11,7 @@ PUSH_SPEED   = 15
 BACK_SPEED   = 10
 BACK_TIME    = 0.8
 IR_NEAR_OBJ  = 5
-QR_DISTANCE  = 10   # ajustar según pruebas
+QR_DISTANCE  = 100   # ajustar según pruebas
 
 class PushToZone(Behaviour):
 
@@ -35,16 +35,21 @@ class PushToZone(Behaviour):
 
         # Empujar hasta llegar al contenedor o perder el QR
         while not self.stopped():
-            self.robot.moveWheels(PUSH_SPEED, PUSH_SPEED)
-            self.robot.wait(0.1)
-
             qr = self.robot.readQR()
             if qr is not None and qr.distance > 0:
-                print(f"      push QR distance={qr.distance:.1f}")
-                if qr.distance < QR_DISTANCE:
+                print(f"      push QR distance={qr.distance:.1f} x={qr.x}")
+                if qr.distance > QR_DISTANCE:
                     self.robot.stopMotors()
                     print("      Llegado al contenedor.")
                     break
+
+                error = qr.x - 200
+                if error > 20:
+                    self.robot.moveWheels(PUSH_SPEED, PUSH_SPEED - 5)
+                elif error < -20:
+                    self.robot.moveWheels(PUSH_SPEED - 5, PUSH_SPEED)
+                else:
+                    self.robot.moveWheels(PUSH_SPEED, PUSH_SPEED)
             else:
                 # Perdió el QR → ceder a FindContainer
                 self.robot.stopMotors()
@@ -53,6 +58,8 @@ class PushToZone(Behaviour):
                 for bh in self.supress_list:
                     bh.supress = False
                 return
+
+            self.robot.wait(0.1)
 
         # Retroceder del contenedor
         self.robot.moveWheels(-BACK_SPEED, -BACK_SPEED)
