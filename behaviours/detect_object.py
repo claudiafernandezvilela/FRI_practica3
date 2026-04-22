@@ -6,9 +6,11 @@ from .behaviour import Behaviour
 from robobopy.utils.IR import IR
 
 MIN_CONFIDENCE = 0.5
-IMAGE_CENTER_X = 160   # Centro horizontal de la imagen (320px / 2)
-IR_GOAL        = 20    # Umbral para pasar a approach final
-IR_CONTACT     = 100    # Umbral de contacto real con el objeto
+IMAGE_CENTER_X = 160
+IR_GOAL        = 20
+IR_CONTACT     = 100
+
+TARGET_LABEL   = "bottle"  # cambiar para detectar otro objeto
 
 # Parámetros PD
 KP = 0.02
@@ -28,7 +30,9 @@ class DetectObject(Behaviour):
 
     def _read_object(self):
         obj = self.robot.readDetectedObject()
-        if obj is not None and obj.label is not None and obj.confidence >= MIN_CONFIDENCE:
+        if obj is not None and obj.label is not None \
+                and obj.confidence >= MIN_CONFIDENCE \
+                and obj.label.lower() == TARGET_LABEL:
             return obj
         return None
 
@@ -65,7 +69,6 @@ class DetectObject(Behaviour):
         return True
 
     def action(self):
-        # Guardia: si ya estamos cerca al entrar, no hacer nada
         if self.params.get("objeto_cerca"):
             return
 
@@ -80,7 +83,6 @@ class DetectObject(Behaviour):
 
             obj = self._read_object()
 
-            # Si pierde el objeto, ceder control a Explore
             if obj is None:
                 print("      Objeto perdido, cediendo control.")
                 self.robot.stopMotors()
@@ -89,15 +91,11 @@ class DetectObject(Behaviour):
             self.params["obj"] = obj
             ir_central = self.robot.readIRSensor(IR.FrontC)
 
-            # Fase 2: ya está cerca, approach final
             if ir_central is not None and ir_central >= IR_GOAL:
                 self.robot.stopMotors()
                 self._approach_final()
                 break
 
-            # Fase 1: control PD para centrarse y avanzar
-
-            # Detección dudosa con x=0: girar buscando el objeto
             if obj.x == 0:
                 self.robot.moveWheels(BASE_SPEED, -BASE_SPEED)
                 self.robot.wait(0.1)
