@@ -17,6 +17,8 @@ KD = 0.9
 # Velocidad base de avance
 BASE_SPEED = 10
 
+TARGET_LABELS = {"cup", "bottle", "apple"}  # objetos a recoger
+
 def clamp(value, min_val, max_val):
     return max(min_val, min(value, max_val))
 
@@ -30,6 +32,7 @@ class DetectObject(Behaviour):
         obj = self.robot.readDetectedObject()
         if obj is not None and obj.label is not None \
                 and obj.confidence >= MIN_CONFIDENCE \
+                and obj.label.lower() in TARGET_LABELS \
                 and obj.label.lower() not in self.params.get("depositados", set()):
             return obj
         return None
