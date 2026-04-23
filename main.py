@@ -1,4 +1,6 @@
 from robobopy.Robobo import Robobo
+from behaviours.detect_clap import DetectClap
+from behaviours.avoid_wall import AvoidWall
 from behaviours.explore import Explore
 from behaviours.detect_object import DetectObject
 from behaviours.find_container import FindContainer
@@ -17,20 +19,23 @@ def main():
     robobo.wait(1)
 
     params = {
-        "stop":            False,
-        "detected_object": None,
-        "objeto_cerca":    False,
-        "qr_centered":     False,
-        "obj":             None,
+        "stop":             False,
+        "detected_object":  None,
+        "objeto_cerca":     False,
+        "qr_centered":      False,
+        "obj":              None,
         "depositados":      set(),
     }
 
     explore        = Explore(robobo, [], params)
-    detect         = DetectObject(robobo, [explore], params)
-    find_container = FindContainer(robobo, [explore, detect], params)
-    push_to_zone   = PushToZone(robobo, [explore, detect, find_container], params)
+    avoid_wall     = AvoidWall(robobo, [explore], params)
+    detect         = DetectObject(robobo, [explore, avoid_wall], params)
+    find_container = FindContainer(robobo, [explore, avoid_wall, detect], params)
+    push_to_zone   = PushToZone(robobo, [explore, avoid_wall, detect, find_container], params)
+    detect_clap    = DetectClap(robobo, [explore, avoid_wall, detect, find_container, push_to_zone], params)
 
-    threads = [explore, detect, find_container, push_to_zone]
+    threads = [explore, avoid_wall, detect, find_container, push_to_zone, detect_clap]
+
     for t in threads:
         t.start()
 
