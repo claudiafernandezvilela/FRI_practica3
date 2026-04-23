@@ -22,6 +22,7 @@ def main():
         "objeto_cerca":    False,
         "qr_centered":     False,
         "obj":             None,
+        "depositados":      set(),
     }
 
     explore        = Explore(robobo, [], params)

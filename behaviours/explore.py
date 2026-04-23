@@ -2,7 +2,7 @@ from .behaviour import Behaviour
 
 SPEED      = 5
 TURN_SPEED = 5
-TURN_TIME  = 2  # ajustar según pruebas
+TURN_TIME  = 4  # ajustar según pruebas
 
 class Explore(Behaviour):
 
@@ -39,5 +39,5 @@ class Explore(Behaviour):
 
         # Avanzar un poco para cambiar de posición
         self.robot.moveWheels(SPEED, SPEED)
-        self.robot.wait(0.5)
+        self.robot.wait(1)
         self.robot.stopMotors()

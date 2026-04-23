@@ -1,20 +1,21 @@
 #
 # Comportamiento 3: FindContainer (prioridad 3)
-# Gira el pan buscando el QR correcto y luego alinea el robot.
+# Gira el robot con el objeto buscando el QR correcto.
 #
 
 from .behaviour import Behaviour
+from robobopy.utils.IR import IR
 
 IMAGE_CENTER_X = 160
 CENTER_THRESH  = 25
 PAN_SPEED      = 15
-PAN_STEP       = 15
-PAN_MAX        = 150
-ALIGN_SPEED    = 3    # suave para no pasarse
-PAN_CENTER_TOL = 20   # para antes
+ALIGN_SPEED    = 3
+IR_LOST        = 400
 
 OBJECT_TO_QR = {
-    "bottle":       "PLASTIC",
+    "cup":    "PAPER",
+    "bottle": "PLASTIC",
+    "apple":  "ORGANIC",
 }
 
 class FindContainer(Behaviour):
@@ -31,6 +32,14 @@ class FindContainer(Behaviour):
             return False
         return True
 
+    def _object_lost(self):
+        """Comprueba si el objeto se ha alejado del pusher."""
+        ir_front_c = self.robot.readIRSensor(IR.FrontC)
+        ir_front_l = self.robot.readIRSensor(IR.FrontL)
+        ir_front_r = self.robot.readIRSensor(IR.FrontR)
+        ir_value = max(ir_front_c or 0, ir_front_l or 0, ir_front_r or 0)
+        return ir_value < IR_LOST
+
     def action(self):
         print("----> control: FindContainer")
         self.supress = False
@@ -40,45 +49,61 @@ class FindContainer(Behaviour):
 
         self.robot.movePanTo(0, PAN_SPEED, wait=True)
 
-        label      = self.params["detected_object"].label.lower()
-        target_qr  = OBJECT_TO_QR.get(label)
+        label     = self.params["detected_object"].label.lower()
+        target_qr = OBJECT_TO_QR.get(label)
         print(f"      Buscando QR '{target_qr}' para '{label}'")
 
-        # Girar el pan barriendo izquierda a derecha buscando el QR
         while not self.stopped():
-            for pan_pos in list(range(0, PAN_MAX, PAN_STEP)) + list(range(PAN_MAX, -PAN_MAX, -PAN_STEP)) + list(range(-PAN_MAX, 0, PAN_STEP)):
-                self.robot.movePanTo(pan_pos, PAN_SPEED, wait=True)
 
-                qr = self.robot.readQR()
-                if qr is not None and qr.distance > 0 and str(qr.id) == target_qr:
-                    print(f"      QR '{target_qr}' encontrado, centrando...")
+            # Comprobar que el objeto sigue cerca
+            if self._object_lost():
+                print("      Objeto perdido, volviendo a DetectObject.")
+                self.robot.stopMotors()
+                self.params["objeto_cerca"]    = False
+                self.params["detected_object"] = None
+                for bh in self.supress_list:
+                    bh.supress = False
+                return
 
-                    # Centrar el pan sobre el QR
-                    error_px = qr.x - IMAGE_CENTER_X
-                    new_pan  = pan_pos + error_px * 0.3
-                    new_pan  = max(-PAN_MAX, min(PAN_MAX, new_pan))
-                    self.robot.movePanTo(int(new_pan), PAN_SPEED, wait=True)
+            qr = self.robot.readQR()
 
-                    # Alinear el cuerpo girando ruedas hasta que pan ≈ 0
-                    for _ in range(30):
-                        pan = self.robot.readPanPosition()
-                        print(f"      Alineando pan={pan:.0f}°")
-                        if abs(pan) < PAN_CENTER_TOL:
-                            break
-                        if pan > 0:
-                            self.robot.moveWheels(-ALIGN_SPEED, ALIGN_SPEED)
-                        else:
-                            self.robot.moveWheels(ALIGN_SPEED, -ALIGN_SPEED)
-                        self.robot.wait(0.1)
+            if qr is not None and qr.distance > 0 and str(qr.id) == target_qr:
+                error = qr.x - IMAGE_CENTER_X
+                print(f"      QR x={qr.x} error={error:.0f}")
 
+                if abs(error) < CENTER_THRESH:
                     self.robot.stopMotors()
-                    self.robot.movePanTo(0, PAN_SPEED, wait=True)
                     self.params["qr_centered"] = True
                     print("      Listo, cuerpo alineado con QR.")
-
                     for bh in self.supress_list:
                         bh.supress = False
                     return
+
+                if error > 0:
+                    self.robot.moveWheels(ALIGN_SPEED, -ALIGN_SPEED)
+                else:
+                    self.robot.moveWheels(-ALIGN_SPEED, ALIGN_SPEED)
+
+            else:
+                # QR no visible, barrer izquierda y derecha
+                for _ in range(180):
+                    if self._object_lost():
+                        break
+                    self.robot.moveWheels(-ALIGN_SPEED, ALIGN_SPEED)
+                    self.robot.wait(0.1)
+                    qr = self.robot.readQR()
+                    if qr is not None and qr.distance > 0 and str(qr.id) == target_qr:
+                        break
+                for _ in range(180):
+                    if self._object_lost():
+                        break
+                    self.robot.moveWheels(ALIGN_SPEED, -ALIGN_SPEED)
+                    self.robot.wait(0.1)
+                    qr = self.robot.readQR()
+                    if qr is not None and qr.distance > 0 and str(qr.id) == target_qr:
+                        break
+
+            self.robot.wait(0.1)
 
         for bh in self.supress_list:
             bh.supress = False

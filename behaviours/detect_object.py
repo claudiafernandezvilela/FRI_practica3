@@ -8,13 +8,11 @@ from robobopy.utils.IR import IR
 MIN_CONFIDENCE = 0.5
 IMAGE_CENTER_X = 160
 IR_GOAL        = 20
-IR_CONTACT     = 100
-
-TARGET_LABEL   = "bottle"  # cambiar para detectar otro objeto
+IR_CONTACT     = 800
 
 # Parámetros PD
-KP = 0.02
-KD = 0.05
+KP = 0.04
+KD = 0.9
 
 # Velocidad base de avance
 BASE_SPEED = 10
@@ -32,7 +30,7 @@ class DetectObject(Behaviour):
         obj = self.robot.readDetectedObject()
         if obj is not None and obj.label is not None \
                 and obj.confidence >= MIN_CONFIDENCE \
-                and obj.label.lower() == TARGET_LABEL:
+                and obj.label.lower() not in self.params.get("depositados", set()):
             return obj
         return None
 

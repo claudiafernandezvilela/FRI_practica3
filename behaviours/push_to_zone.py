@@ -8,10 +8,10 @@ from .behaviour import Behaviour
 from robobopy.utils.IR import IR
 
 PUSH_SPEED   = 15
-BACK_SPEED   = 10
-BACK_TIME    = 0.8
+BACK_SPEED   = 6
+BACK_TIME    = 2
 IR_NEAR_OBJ  = 5
-QR_DISTANCE  = 100   # ajustar según pruebas
+QR_DISTANCE  = 100
 
 class PushToZone(Behaviour):
 
@@ -33,7 +33,6 @@ class PushToZone(Behaviour):
         for bh in self.supress_list:
             bh.supress = True
 
-        # Empujar hasta llegar al contenedor o perder el QR
         while not self.stopped():
             qr = self.robot.readQR()
             if qr is not None and qr.distance > 0:
@@ -51,7 +50,6 @@ class PushToZone(Behaviour):
                 else:
                     self.robot.moveWheels(PUSH_SPEED, PUSH_SPEED)
             else:
-                # Perdió el QR → ceder a FindContainer
                 self.robot.stopMotors()
                 print("      QR perdido, volviendo a FindContainer.")
                 self.params["qr_centered"] = False
@@ -66,13 +64,28 @@ class PushToZone(Behaviour):
         self.robot.wait(BACK_TIME)
         self.robot.stopMotors()
 
+        # Girar 180° para mirar hacia los objetos
+        self.robot.moveWheels(BACK_SPEED, -BACK_SPEED)
+        self.robot.wait(4)  # ajustar según pruebas
+        self.robot.stopMotors()
+
+        # Añadir a depositados
+        label = self.params["detected_object"].label.lower()
+        self.params["depositados"].add(label)
+        print(f"      Objeto '{label}' depositado. Total: {self.params['depositados']}")
+
         # Resetear estado
         self.params["detected_object"] = None
         self.params["qr_centered"]     = False
-        self.params["objeto_cerca"]     = False
+        self.params["objeto_cerca"]    = False
+        self.params["obj"]             = None
 
-        print("      Objeto depositado.")
-        self.params["stop"] = True
+        # Parar si ya están todos
+        if self.params["depositados"] >= {"cup", "bottle", "apple"}:
+            print("      Todos los objetos depositados.")
+            self.params["stop"] = True
+        else:
+            print("      Buscando siguiente objeto...")
 
         for bh in self.supress_list:
             bh.supress = False
