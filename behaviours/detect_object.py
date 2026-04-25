@@ -5,19 +5,19 @@
 from .behaviour import Behaviour
 from robobopy.utils.IR import IR
 
-MIN_CONFIDENCE = 0.5
-IMAGE_CENTER_X = 160
+MIN_CONFIDENCE = 0.4
+IMAGE_CENTER_X = 250
 IR_GOAL        = 20
-IR_CONTACT     = 800
+IR_CONTACT     = 200
 
 # Parámetros PD
-KP = 0.04
-KD = 0.9
+KP = 0.1
+KD = 0.7
 
 # Velocidad base de avance
-BASE_SPEED = 10
+BASE_SPEED = 6
 
-TARGET_LABELS = {"cup", "bottle", "apple"}  # objetos a recoger
+TARGET_LABELS = {"cup", "bottle", "apple", "clock", "dog", "orange"}
 
 def clamp(value, min_val, max_val):
     return max(min_val, min(value, max_val))
@@ -36,6 +36,41 @@ class DetectObject(Behaviour):
                 and obj.label.lower() not in self.params.get("depositados", set()):
             return obj
         return None
+
+    def _center_on_object(self):
+        """Gira el robot hasta centrar el objeto en imagen con control PD."""
+        print("      Centrando objeto...")
+        CENTER_X  = 250
+        DEAD_ZONE = 15
+        MAX_SPEED = 3
+        MIN_SPEED = 1
+        KP        = 0.08
+        KD        = 0.5
+        last_err  = 0
+
+        while not self.stopped():
+            obj = self._read_object()
+            if obj is None or obj.x == 0:
+                break
+
+            error      = obj.x - CENTER_X
+            derivative = error - last_err
+            last_err   = error
+
+            if abs(error) < DEAD_ZONE:
+                self.robot.stopMotors()
+                print(f"      Objeto centrado (x={obj.x})")
+                break
+
+            correction = (error * KP) + (derivative * KD)
+            speed = max(MIN_SPEED, min(MAX_SPEED, int(abs(correction))))
+
+            if correction > 0:
+                self.robot.moveWheels(speed, -speed)  # girar derecha
+            else:
+                self.robot.moveWheels(-speed, speed)  # girar izquierda
+
+            self.robot.wait(0.15)
 
     def _approach_final(self):
         """Avanza despacio hasta contacto real con el objeto."""
@@ -79,6 +114,9 @@ class DetectObject(Behaviour):
 
         for bh in self.supress_list:
             bh.supress = True
+
+        # Centrar robot sobre el objeto antes de avanzar
+        self._center_on_object()
 
         while not self.stopped():
 

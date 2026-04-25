@@ -1,7 +1,7 @@
 from .behaviour import Behaviour
 
-SPEED      = 5
-TURN_SPEED = 5
+SPEED      = 3
+TURN_SPEED = 2
 TURN_TIME  = 4  # ajustar según pruebas
 
 class Explore(Behaviour):
@@ -15,6 +15,8 @@ class Explore(Behaviour):
     def action(self):
         print("----> control: Explore")
         self.supress = False
+
+        self.robot.moveTiltTo(110, 60)
 
         # Girar derecha, centro, izquierda, centro
         # Derecha

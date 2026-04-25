@@ -1,21 +1,41 @@
 from robobopy.Robobo import Robobo
-from behaviours.detect_clap import DetectClap
-from behaviours.avoid_wall import AvoidWall
+from behaviours.detect_tap import DetectTap
+from behaviours.led_feedback import LedFeedback
 from behaviours.explore import Explore
 from behaviours.detect_object import DetectObject
 from behaviours.find_container import FindContainer
 from behaviours.push_to_zone import PushToZone
+import cv2
+from robobopy_videostream.RoboboVideo import RoboboVideo
 import time
+from robobopy.utils.LED import LED
+from robobopy.utils.Color import Color
 
 def main():
-    robobo = Robobo("localhost")
+    robobo = Robobo("10.20.29.71")
     robobo.connect()
     robobo.wait(1)
+
+    robobo.setStreamFps(20)
+    robobo.startStream()
+    robobo.wait(2)
+
+    videoStream = RoboboVideo("10.20.29.71")
+    videoStream.connect()
+    robobo.wait(2)
+
+    robobo.stopStream()
+    robobo.wait(0.5)
+    robobo.startCamera()
+    robobo.wait(1)
+    robobo.setStreamFps(20)
+    robobo.startStream()
+    robobo.wait(2)
 
     robobo.startObjectRecognition()
     robobo.wait(0.5)
 
-    robobo.moveTiltTo(120, 60)
+    robobo.moveTiltTo(100, 60)
     robobo.wait(1)
 
     params = {
@@ -28,19 +48,38 @@ def main():
     }
 
     explore        = Explore(robobo, [], params)
-    avoid_wall     = AvoidWall(robobo, [explore], params)
-    detect         = DetectObject(robobo, [explore, avoid_wall], params)
-    find_container = FindContainer(robobo, [explore, avoid_wall, detect], params)
-    push_to_zone   = PushToZone(robobo, [explore, avoid_wall, detect, find_container], params)
-    detect_clap    = DetectClap(robobo, [explore, avoid_wall, detect, find_container, push_to_zone], params)
+    detect         = DetectObject(robobo, [explore], params)
+    find_container = FindContainer(robobo, [explore, detect], params)
+    push_to_zone   = PushToZone(robobo, [explore, detect, find_container], params)
+    detect_tap    = DetectTap(robobo, [explore, detect, find_container, push_to_zone], params)
+    led            = LedFeedback(robobo, [], params)  # sin supress_list, prioridad mínima
 
-    threads = [explore, avoid_wall, detect, find_container, push_to_zone, detect_clap]
+    threads = [explore, detect, find_container, push_to_zone, detect_tap, led]
 
     for t in threads:
         t.start()
 
-    while not params["stop"]:
-        time.sleep(0.1)
+    try:
+        while not params["stop"]:
+            try:
+                frame = videoStream.getImage()
+            except TypeError:
+                time.sleep(0.1)
+                continue
+
+            if frame is None:
+                time.sleep(0.1)
+                continue
+
+            cv2.imshow("Robobo Camera", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                params["stop"] = True
+
+            time.sleep(0.05)
+
+    except KeyboardInterrupt:
+        print("=== Interrupción manual. Parando... ===")
+        params["stop"] = True
 
     print("=== Misión completada. ===")
 
@@ -49,6 +88,10 @@ def main():
 
     robobo.stopMotors()
     robobo.stopObjectRecognition()
+    robobo.stopStream()
+    robobo.setLedColorTo(LED.All, Color.OFF)  # apagar LEDs al terminar
+    cv2.destroyAllWindows()
+    videoStream.disconnect()
     robobo.disconnect()
 
 if __name__ == "__main__":

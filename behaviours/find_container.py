@@ -1,21 +1,19 @@
-#
-# Comportamiento 3: FindContainer (prioridad 3)
-# Gira el robot con el objeto buscando el QR correcto.
-#
+# find_container.py
 
 from .behaviour import Behaviour
 from robobopy.utils.IR import IR
 
 IMAGE_CENTER_X = 160
-CENTER_THRESH  = 25
-PAN_SPEED      = 15
-ALIGN_SPEED    = 3
-IR_LOST        = 400
+CENTER_THRESH  = 20
+ALIGN_SPEED    = 2
 
 OBJECT_TO_QR = {
-    "cup":    "PAPER",
-    "bottle": "PLASTIC",
-    "apple":  "ORGANIC",
+    "cup":    "Paper",
+    "bottle": "Plastic",
+    "apple":  "Organic",
+    "clock":  "Paper",
+    "dog": "Organic",
+    "orange": "Organic"
 }
 
 class FindContainer(Behaviour):
@@ -32,14 +30,6 @@ class FindContainer(Behaviour):
             return False
         return True
 
-    def _object_lost(self):
-        """Comprueba si el objeto se ha alejado del pusher."""
-        ir_front_c = self.robot.readIRSensor(IR.FrontC)
-        ir_front_l = self.robot.readIRSensor(IR.FrontL)
-        ir_front_r = self.robot.readIRSensor(IR.FrontR)
-        ir_value = max(ir_front_c or 0, ir_front_l or 0, ir_front_r or 0)
-        return ir_value < IR_LOST
-
     def action(self):
         print("----> control: FindContainer")
         self.supress = False
@@ -47,61 +37,68 @@ class FindContainer(Behaviour):
         for bh in self.supress_list:
             bh.supress = True
 
-        self.robot.movePanTo(0, PAN_SPEED, wait=True)
+        self.robot.moveTiltTo(80, 60)
+        self.robot.movePanTo(0, 15, wait=True)
+        self.robot.wait(1)
 
         label     = self.params["detected_object"].label.lower()
         target_qr = OBJECT_TO_QR.get(label)
         print(f"      Buscando QR '{target_qr}' para '{label}'")
 
         while not self.stopped():
-
-            # Comprobar que el objeto sigue cerca
-            if self._object_lost():
-                print("      Objeto perdido, volviendo a DetectObject.")
-                self.robot.stopMotors()
-                self.params["objeto_cerca"]    = False
-                self.params["detected_object"] = None
-                for bh in self.supress_list:
-                    bh.supress = False
-                return
-
             qr = self.robot.readQR()
 
             if qr is not None and qr.distance > 0 and str(qr.id) == target_qr:
                 error = qr.x - IMAGE_CENTER_X
-                print(f"      QR x={qr.x} error={error:.0f}")
+                print(f"      QR encontrado x={qr.x} error={error:.0f}")
 
                 if abs(error) < CENTER_THRESH:
                     self.robot.stopMotors()
                     self.params["qr_centered"] = True
-                    print("      Listo, cuerpo alineado con QR.")
+                    print("      Cuerpo alineado con QR.")
                     for bh in self.supress_list:
                         bh.supress = False
                     return
 
+                # Girar hacia el QR
                 if error > 0:
                     self.robot.moveWheels(ALIGN_SPEED, -ALIGN_SPEED)
                 else:
                     self.robot.moveWheels(-ALIGN_SPEED, ALIGN_SPEED)
 
             else:
-                # QR no visible, barrer izquierda y derecha
-                for _ in range(180):
-                    if self._object_lost():
+                # QR no visible: barrer lentamente, 0.1s por paso
+                print(f"      QR no visible, barriendo...")
+                found = False
+
+                # Barrer izquierda (máx 3 segundos)
+                for _ in range(20):
+                    if self.stopped():
                         break
                     self.robot.moveWheels(-ALIGN_SPEED, ALIGN_SPEED)
                     self.robot.wait(0.1)
                     qr = self.robot.readQR()
                     if qr is not None and qr.distance > 0 and str(qr.id) == target_qr:
+                        found = True
                         break
-                for _ in range(180):
-                    if self._object_lost():
-                        break
-                    self.robot.moveWheels(ALIGN_SPEED, -ALIGN_SPEED)
-                    self.robot.wait(0.1)
-                    qr = self.robot.readQR()
-                    if qr is not None and qr.distance > 0 and str(qr.id) == target_qr:
-                        break
+
+                if not found:
+                    # Barrer derecha (máx 6 segundos para cubrir ambos lados)
+                    for _ in range(60):
+                        if self.stopped():
+                            break
+                        self.robot.moveWheels(ALIGN_SPEED, -ALIGN_SPEED)
+                        self.robot.wait(0.1)
+                        qr = self.robot.readQR()
+                        if qr is not None and qr.distance > 0 and str(qr.id) == target_qr:
+                            found = True
+                            break
+
+                if not found:
+                    # Volver al centro y repetir
+                    self.robot.moveWheels(-ALIGN_SPEED, ALIGN_SPEED)
+                    self.robot.wait(1.5)
+                    self.robot.stopMotors()
 
             self.robot.wait(0.1)
 
