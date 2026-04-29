@@ -5,7 +5,7 @@
 from .behaviour import Behaviour
 from robobopy.utils.IR import IR
 
-MIN_CONFIDENCE = 0.4
+MIN_CONFIDENCE = 0.5
 IMAGE_CENTER_X = 250
 IR_GOAL        = 20
 IR_CONTACT     = 200
@@ -17,7 +17,7 @@ KD = 0.7
 # Velocidad base de avance
 BASE_SPEED = 6
 
-TARGET_LABELS = {"cup", "bottle", "apple", "clock", "dog", "orange"}
+TARGET_LABELS = { "bottle", "dog", "orange"}
 
 def clamp(value, min_val, max_val):
     return max(min_val, min(value, max_val))

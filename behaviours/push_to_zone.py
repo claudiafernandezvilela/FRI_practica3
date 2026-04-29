@@ -7,7 +7,7 @@ PUSH_SPEED  = 8
 BACK_SPEED  = 10
 BACK_TIME   = 5
 IR_NEAR_OBJ = 5
-QR_CLOSE    = 590   # distancia a la que consideramos que llegamos al contenedor
+QR_CLOSE    = 580
 
 class PushToZone(Behaviour):
 
@@ -35,11 +35,11 @@ class PushToZone(Behaviour):
             if qr is not None and qr.distance > 0:
                 print(f"      push QR distance={qr.distance:.1f} x={qr.x}")
 
-                # Llegamos cuando la distancia supera QR_CLOSE
-                # (a mayor distancia en esta librería = más cerca físicamente)
                 if qr.distance <= QR_CLOSE:
                     self.robot.stopMotors()
                     print("      Llegado al contenedor.")
+                    self.params["qr_centered"] = False
+                    self.supress = True  # evitar reactivación durante retroceso
                     break
 
                 # Corregir dirección mientras avanza
@@ -62,6 +62,7 @@ class PushToZone(Behaviour):
             self.robot.wait(0.1)
 
         self.robot.wait(2)
+
         # Retroceder
         self.robot.moveWheels(-BACK_SPEED, -BACK_SPEED)
         self.robot.wait(BACK_TIME)
@@ -87,5 +88,6 @@ class PushToZone(Behaviour):
         else:
             print("      Buscando siguiente objeto...")
 
+        self.supress = False  # restaurar al terminar
         for bh in self.supress_list:
             bh.supress = False

@@ -3,16 +3,15 @@
 from .behaviour import Behaviour
 from robobopy.utils.IR import IR
 
-IMAGE_CENTER_X = 160
-CENTER_THRESH  = 20
+IMAGE_CENTER_X = 250
+CENTER_THRESH  = 50
 ALIGN_SPEED    = 2
 
 OBJECT_TO_QR = {
     "cup":    "Paper",
     "bottle": "Plastic",
     "apple":  "Organic",
-    "clock":  "Paper",
-    "dog": "Organic",
+    "dog": "Paper",
     "orange": "Organic"
 }
 
@@ -65,6 +64,8 @@ class FindContainer(Behaviour):
                     self.robot.moveWheels(ALIGN_SPEED, -ALIGN_SPEED)
                 else:
                     self.robot.moveWheels(-ALIGN_SPEED, ALIGN_SPEED)
+
+                self.robot.wait(0.1)
 
             else:
                 # QR no visible: barrer lentamente, 0.1s por paso
