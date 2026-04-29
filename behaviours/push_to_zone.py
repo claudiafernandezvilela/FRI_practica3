@@ -7,7 +7,7 @@ PUSH_SPEED  = 8
 BACK_SPEED  = 10
 BACK_TIME   = 5
 IR_NEAR_OBJ = 5
-QR_CLOSE    = 580
+QR_CLOSE    = 100
 
 class PushToZone(Behaviour):
 
