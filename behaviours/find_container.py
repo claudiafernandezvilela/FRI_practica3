@@ -73,7 +73,7 @@ class FindContainer(Behaviour):
                 found = False
 
                 # Barrer izquierda (máx 3 segundos)
-                for _ in range(60):
+                for _ in range(20):
                     if self.stopped():
                         break
                     self.robot.moveWheels(-ALIGN_SPEED, ALIGN_SPEED)

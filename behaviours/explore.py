@@ -17,6 +17,9 @@ class Explore(Behaviour):
         print("----> control: Explore")
         self.supress = False
 
+        for bh in self.supress_list:
+            bh.supress = True
+
         self.robot.moveTiltTo(100, 60)
 
         # Girar derecha
@@ -52,3 +55,6 @@ class Explore(Behaviour):
         self.robot.moveWheels(SPEED, SPEED)
         self.robot.wait(4)
         self.robot.stopMotors()
+
+        for bh in self.supress_list:
+            bh.supress = False

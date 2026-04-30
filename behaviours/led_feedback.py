@@ -27,6 +27,11 @@ class LedFeedback(Behaviour):
     def action(self):
         last_state = None
 
+        self.supress = False
+
+        for bh in self.supress_list:
+            bh.supress = True
+
         while not self.stopped() and not self.supress:
             state = self._get_state()
 
@@ -47,3 +52,6 @@ class LedFeedback(Behaviour):
                     print("      LEDs: empujando (rojo)")
 
             self.robot.wait(0.1)
+        
+        for bh in self.supress_list:
+            bh.supress = False
