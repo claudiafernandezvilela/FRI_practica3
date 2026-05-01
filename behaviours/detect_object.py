@@ -7,7 +7,7 @@ from robobopy.utils.IR import IR
 
 MIN_CONFIDENCE = 0.5
 IMAGE_CENTER_X = 250
-IR_GOAL        = 20
+IR_GOAL        = 15
 IR_CONTACT     = 200
 
 # Parámetros PD
